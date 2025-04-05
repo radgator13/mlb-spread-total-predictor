@@ -117,7 +117,8 @@ def predict_margin(home_p, away_p, home_h, away_h):
 
 # 🔁 UPDATED TO FIX "Under every time" problem
 def predict_total(home_p, away_p, home_h, away_h):
-    return round((home_h + away_h) * 0.12 - (home_p + away_p) * 0.05 + 9.0, 2)
+    return round((home_h + away_h) * 0.14 - (home_p + away_p) * 0.04 + 9.2, 2)
+
 
 
 def confidence_score(edge):
