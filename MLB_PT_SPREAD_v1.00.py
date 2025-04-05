@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 from datetime import date
 import math
+import plotly.express as px  # for charting
 
 st.set_page_config(layout="wide")
 
@@ -115,11 +116,9 @@ def extract_vegas_odds(vegas_data, home_team, away_team):
 def predict_margin(home_p, away_p, home_h, away_h):
     return round((home_p - away_p) * 0.4 + (home_h - away_h) * 0.6, 2)
 
-# 🔁 UPDATED TO FIX "Under every time" problem
 def predict_total(home_p, away_p, home_h, away_h):
+    # ✅ Calibrated for more balanced Over/Under
     return round((home_h + away_h) * 0.14 - (home_p + away_p) * 0.04 + 9.2, 2)
-
-
 
 def confidence_score(edge):
     if edge is None:
@@ -137,7 +136,7 @@ def confidence_score(edge):
         return "🔥"
 
 # --- Streamlit App ---
-st.title("⚾ MLB Spread & Total Predictor with Smart Picks & Confidence")
+st.title("⚾ MLB Spread & Total Predictor with Smart Picks & Charts")
 
 selected_date = st.date_input("Select Game Date", date.today())
 games_df = fetch_schedule(selected_date)
@@ -238,7 +237,7 @@ with col1:
     st.markdown("#### 🟢 Best Spread Picks")
     st.dataframe(
         top_spread_picks[
-            ["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)", 
+            ["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)",
              "Model Pick (Spread)", "Confidence (Spread)"]
         ].reset_index(drop=True),
         use_container_width=True
@@ -253,3 +252,36 @@ with col2:
         ].reset_index(drop=True),
         use_container_width=True
     )
+
+# --- Chart View ---
+st.subheader("📊 Model vs Vegas Totals")
+
+chart_df = df.dropna(subset=["Model Total Runs", "Vegas Total"]).copy()
+chart_df = chart_df.sort_values(by="Model Total Runs", ascending=False)
+
+fig_total = px.bar(
+    chart_df,
+    x="Matchup",
+    y=["Model Total Runs", "Vegas Total"],
+    barmode="group",
+    title="Model vs Vegas: Projected Total Runs",
+    labels={"value": "Total Runs", "variable": "Source"},
+    height=500
+)
+st.plotly_chart(fig_total, use_container_width=True)
+
+st.subheader("📊 Model vs Vegas Spread (Margin)")
+
+chart_df = df.dropna(subset=["Model Margin (H - A)", "Vegas Spread"]).copy()
+chart_df = chart_df.sort_values(by="Model Margin (H - A)", ascending=False)
+
+fig_spread = px.bar(
+    chart_df,
+    x="Matchup",
+    y=["Model Margin (H - A)", "Vegas Spread"],
+    barmode="group",
+    title="Model vs Vegas: Spread Prediction",
+    labels={"value": "Spread", "variable": "Source"},
+    height=500
+)
+st.plotly_chart(fig_spread, use_container_width=True)
