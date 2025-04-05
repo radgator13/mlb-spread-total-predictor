@@ -7,7 +7,7 @@ import math
 st.set_page_config(layout="wide")
 
 # --- Configuration ---
-API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your actual Odds API key
+API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your Odds API key
 SPORT = 'baseball_mlb'
 REGIONS = 'us'
 MARKETS = 'spreads,totals'
@@ -118,8 +118,23 @@ def predict_margin(home_p, away_p, home_h, away_h):
 def predict_total(home_p, away_p, home_h, away_h):
     return round((home_h + away_h) * 0.1 - (home_p + away_p) * 0.08 + 8.5, 2)
 
+def confidence_score(edge):
+    if edge is None:
+        return "-"
+    abs_edge = abs(edge)
+    if abs_edge >= 2.0:
+        return "🔥🔥🔥🔥🔥"
+    elif abs_edge >= 1.5:
+        return "🔥🔥🔥🔥"
+    elif abs_edge >= 1.0:
+        return "🔥🔥🔥"
+    elif abs_edge >= 0.5:
+        return "🔥🔥"
+    else:
+        return "🔥"
+
 # --- Streamlit App ---
-st.title("⚾ MLB Spread & Total Predictor with Vegas Lines")
+st.title("⚾ MLB Spread & Total Predictor with Vegas Lines + Smart Picks")
 
 selected_date = st.date_input("Select Game Date", date.today())
 games_df = fetch_schedule(selected_date)
@@ -173,9 +188,11 @@ with st.spinner("Running model + Vegas comparison..."):
                 "Model Margin (H - A)": model_margin,
                 "Vegas Spread": vegas_spread,
                 "Edge (Spread)": margin_edge,
+                "Confidence (Spread)": confidence_score(margin_edge),
                 "Model Total Runs": model_total,
                 "Vegas Total": vegas_total,
-                "Edge (Total)": total_edge
+                "Edge (Total)": total_edge,
+                "Confidence (Total)": confidence_score(total_edge)
             })
 
             progress.progress((i + 1) / len(games_df))
@@ -205,8 +222,8 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("#### 🟢 Best Spread Edges")
-    st.dataframe(top_spread_picks[["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)"]].reset_index(drop=True), use_container_width=True)
+    st.dataframe(top_spread_picks[["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)", "Confidence (Spread)"]].reset_index(drop=True), use_container_width=True)
 
 with col2:
     st.markdown("#### 🔵 Best O/U Edges")
-    st.dataframe(top_total_picks[["Matchup", "Model Total Runs", "Vegas Total", "Edge (Total)"]].reset_index(drop=True), use_container_width=True)
+    st.dataframe(top_total_picks[["Matchup", "Model Total Runs", "Vegas Total", "Edge (Total)", "Confidence (Total)"]].reset_index(drop=True), use_container_width=True)
