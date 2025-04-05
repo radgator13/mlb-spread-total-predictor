@@ -6,14 +6,22 @@ import math
 
 st.set_page_config(layout="wide")
 
+# --- Configuration ---
+API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your actual API key
+SPORT = 'baseball_mlb'
+REGIONS = 'us'  # Regions: us, uk, eu, au
+MARKETS = 'spreads,totals'  # Betting markets: h2h, spreads, totals
+ODDS_FORMAT = 'american'  # Odds format: decimal or american
+
 # --- Cached API fetch ---
 @st.cache_data(ttl=3600)
-def fetch_json(url):
+def fetch_json(url, headers=None):
     try:
-        res = requests.get(url)
+        res = requests.get(url, headers=headers)
         res.raise_for_status()
         return res.json()
-    except:
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
         return {}
 
 @st.cache_data(ttl=3600)
@@ -88,8 +96,28 @@ def predict_margin(home_p, away_p, home_h, away_h):
 def predict_total(home_p, away_p, home_h, away_h):
     return round((home_h + away_h) * 0.1 - (home_p + away_p) * 0.08 + 8.5, 2)
 
+# --- Fetch Vegas Lines ---
+@st.cache_data(ttl=3600)
+def fetch_vegas_lines():
+    url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds?regions={REGIONS}&markets={MARKETS}&oddsFormat={ODDS_FORMAT}&apiKey={API_KEY}"
+    return fetch_json(url)
+
+def extract_vegas_odds(vegas_data, home_team, away_team):
+    for game in vegas_data:
+        if game['home_team'] == home_team and game['away_team'] == away_team:
+            spreads = None
+            totals = None
+            for bookmaker in game.get('bookmakers', []):
+                for market in bookmaker.get('markets', []):
+                    if market['key'] == 'spreads':
+                        spreads = market['outcomes']
+                    elif market['key'] == 'totals':
+                        totals = market['outcomes']
+            return spreads, totals
+    return None, None
+
 # --- Streamlit App ---
-st.title("⚾ MLB Spread & Total Predictor")
+st.title("⚾ MLB Spread & Total Predictor with Vegas Lines")
 
 selected_date = st.date_input("Select Game Date", date.today())
 games_df = fetch_schedule(selected_date)
@@ -97,6 +125,8 @@ games_df = fetch_schedule(selected_date)
 if games_df.empty:
     st.warning("No games found.")
     st.stop()
+
+vegas_data = fetch_vegas_lines()
 
 results = []
 team_rosters = {}
@@ -108,42 +138,6 @@ def get_cached_roster(team_id):
 
 progress = st.progress(0)
 
-with st.spinner("Running model predictions..."):
-    for i, (_, game) in enumerate(games_df.iterrows()):
-        game_id = game['game_id']
-        matchup = f"{game['away']} @ {game['home']}"
-        pitchers = get_probable_pitchers(game_id)
-
-        if not pitchers['home'] or not pitchers['away']:
-            progress.progress((i + 1) / len(games_df))
-            continue
-
-        home_p_stats = fetch_stats(pitchers['home'], 'pitching')
-        away_p_stats = fetch_stats(pitchers['away'], 'pitching')
-        home_p_score = pitcher_score(home_p_stats)
-        away_p_score = pitcher_score(away_p_stats)
-
-        home_roster = get_cached_roster(game['home_id'])
-        away_roster = get_cached_roster(game['away_id'])
-        home_h_score = hitter_score(home_roster)
-        away_h_score = hitter_score(away_roster)
-
-        predicted_margin = predict_margin(home_p_score, away_p_score, home_h_score, away_h_score)
-        predicted_total = predict_total(home_p_score, away_p_score, home_h_score, away_h_score)
-
-        results.append({
-            "Matchup": matchup,
-            "Home Pitcher Score": round(home_p_score, 2),
-            "Away Pitcher Score": round(away_p_score, 2),
-            "Home Hitter Score": round(home_h_score, 2),
-            "Away Hitter Score": round(away_h_score, 2),
-            "Predicted Margin (H - A)": predicted_margin,
-            "Predicted Total Runs": predicted_total
-        })
-
-        progress.progress((i + 1) / len(games_df))
-
-# Display results
-df = pd.DataFrame(results)
-st.dataframe(df.sort_values(by="Predicted Margin (H - A)", ascending=False).reset_index(drop=True), use_container_width=True)
-
+with st
+::contentReference[oaicite:4]{index=4}
+ 
