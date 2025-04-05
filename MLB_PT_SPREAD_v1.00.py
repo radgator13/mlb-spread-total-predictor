@@ -115,8 +115,10 @@ def extract_vegas_odds(vegas_data, home_team, away_team):
 def predict_margin(home_p, away_p, home_h, away_h):
     return round((home_p - away_p) * 0.4 + (home_h - away_h) * 0.6, 2)
 
+# 🔁 UPDATED TO FIX "Under every time" problem
 def predict_total(home_p, away_p, home_h, away_h):
-    return round((home_h + away_h) * 0.1 - (home_p + away_p) * 0.08 + 8.5, 2)
+    return round((home_h + away_h) * 0.12 - (home_p + away_p) * 0.05 + 9.0, 2)
+
 
 def confidence_score(edge):
     if edge is None:
