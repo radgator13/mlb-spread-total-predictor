@@ -138,6 +138,13 @@ def get_cached_roster(team_id):
 
 progress = st.progress(0)
 
-with st
-::contentReference[oaicite:4]{index=4}
+with st.spinner("Running model predictions..."):
+    progress = st.progress(0)
+
+    for i, (_, game) in enumerate(games_df.iterrows()):
+        # your loop logic...
+        progress.progress((i + 1) / len(games_df))
+
+
+
  
