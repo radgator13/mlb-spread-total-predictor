@@ -7,11 +7,11 @@ import math
 st.set_page_config(layout="wide")
 
 # --- Configuration ---
-API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your actual API key
+API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # 🔑 Replace with your actual key
 SPORT = 'baseball_mlb'
-REGIONS = 'us'  # Regions: us, uk, eu, au
-MARKETS = 'spreads,totals'  # Betting markets: h2h, spreads, totals
-ODDS_FORMAT = 'american'  # Odds format: decimal or american
+REGIONS = 'us'
+MARKETS = 'spreads,totals'
+ODDS_FORMAT = 'american'
 
 # --- Cached API fetch ---
 @st.cache_data(ttl=3600)
@@ -21,7 +21,7 @@ def fetch_json(url, headers=None):
         res.raise_for_status()
         return res.json()
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"Error fetching: {e}")
         return {}
 
 @st.cache_data(ttl=3600)
@@ -89,14 +89,7 @@ def hitter_score(player_ids):
             continue
     return sum(scores) / len(scores) if scores else 50
 
-# --- Spread & Total Model ---
-def predict_margin(home_p, away_p, home_h, away_h):
-    return round((home_p - away_p) * 0.4 + (home_h - away_h) * 0.6, 2)
-
-def predict_total(home_p, away_p, home_h, away_h):
-    return round((home_h + away_h) * 0.1 - (home_p + away_p) * 0.08 + 8.5, 2)
-
-# --- Fetch Vegas Lines ---
+# --- Vegas Odds ---
 @st.cache_data(ttl=3600)
 def fetch_vegas_lines():
     url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds?regions={REGIONS}&markets={MARKETS}&oddsFormat={ODDS_FORMAT}&apiKey={API_KEY}"
@@ -105,16 +98,25 @@ def fetch_vegas_lines():
 def extract_vegas_odds(vegas_data, home_team, away_team):
     for game in vegas_data:
         if game['home_team'] == home_team and game['away_team'] == away_team:
-            spreads = None
-            totals = None
-            for bookmaker in game.get('bookmakers', []):
-                for market in bookmaker.get('markets', []):
+            spread, total = None, None
+            for book in game.get('bookmakers', []):
+                for market in book.get('markets', []):
                     if market['key'] == 'spreads':
-                        spreads = market['outcomes']
-                    elif market['key'] == 'totals':
-                        totals = market['outcomes']
-            return spreads, totals
+                        for outcome in market['outcomes']:
+                            if outcome['name'] == home_team:
+                                spread = outcome['point']
+                    if market['key'] == 'totals':
+                        for outcome in market['outcomes']:
+                            total = outcome['point']
+            return spread, total
     return None, None
+
+# --- Models ---
+def predict_margin(home_p, away_p, home_h, away_h):
+    return round((home_p - away_p) * 0.4 + (home_h - away_h) * 0.6, 2)
+
+def predict_total(home_p, away_p, home_h, away_h):
+    return round((home_h + away_h) * 0.1 - (home_p + away_p) * 0.08 + 8.5, 2)
 
 # --- Streamlit App ---
 st.title("⚾ MLB Spread & Total Predictor with Vegas Lines")
@@ -127,7 +129,6 @@ if games_df.empty:
     st.stop()
 
 vegas_data = fetch_vegas_lines()
-
 results = []
 team_rosters = {}
 
@@ -136,15 +137,55 @@ def get_cached_roster(team_id):
         team_rosters[team_id] = fetch_roster(team_id)
     return team_rosters[team_id]
 
-progress = st.progress(0)
-
-with st.spinner("Running model predictions..."):
+with st.spinner("Running model + Vegas comparison..."):
     progress = st.progress(0)
 
     for i, (_, game) in enumerate(games_df.iterrows()):
-        # your loop logic...
-        progress.progress((i + 1) / len(games_df))
+        try:
+            game_id = game['game_id']
+            matchup = f"{game['away']} @ {game['home']}"
+            pitchers = get_probable_pitchers(game_id)
 
+            if not pitchers['home'] or not pitchers['away']:
+                progress.progress((i + 1) / len(games_df))
+                continue
 
+            st.write(f"📊 Processing: {matchup}")
+            home_p_stats = fetch_stats(pitchers['home'], 'pitching')
+            away_p_stats = fetch_stats(pitchers['away'], 'pitching')
+            home_p_score = pitcher_score(home_p_stats)
+            away_p_score = pitcher_score(away_p_stats)
 
- 
+            home_roster = get_cached_roster(game['home_id'])
+            away_roster = get_cached_roster(game['away_id'])
+            home_h_score = hitter_score(home_roster)
+            away_h_score = hitter_score(away_roster)
+
+            model_margin = predict_margin(home_p_score, away_p_score, home_h_score, away_h_score)
+            model_total = predict_total(home_p_score, away_p_score, home_h_score, away_h_score)
+
+            vegas_spread, vegas_total = extract_vegas_odds(vegas_data, game['home'], game['away'])
+            st.write(f"🧾 Vegas: Spread={vegas_spread}, Total={vegas_total}")
+
+            margin_edge = None if vegas_spread is None else round(model_margin - vegas_spread, 2)
+            total_edge = None if vegas_total is None else round(model_total - vegas_total, 2)
+
+            results.append({
+                "Matchup": matchup,
+                "Model Margin (H - A)": model_margin,
+                "Vegas Spread": vegas_spread,
+                "Edge (Spread)": margin_edge,
+                "Model Total Runs": model_total,
+                "Vegas Total": vegas_total,
+                "Edge (Total)": total_edge
+            })
+
+            progress.progress((i + 1) / len(games_df))
+
+        except Exception as e:
+            st.error(f"❌ Error processing {game['away']} @ {game['home']}: {e}")
+            continue
+
+# --- Display Table ---
+df = pd.DataFrame(results)
+st.dataframe(df.reset_index(drop=True), use_container_width=True)
