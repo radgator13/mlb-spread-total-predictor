@@ -7,7 +7,7 @@ import math
 st.set_page_config(layout="wide")
 
 # --- Configuration ---
-API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your Odds API key
+API_KEY = 'YOUR_API_KEY'  # Replace with your Odds API key
 SPORT = 'baseball_mlb'
 REGIONS = 'us'
 MARKETS = 'spreads,totals'
@@ -134,7 +134,7 @@ def confidence_score(edge):
         return "🔥"
 
 # --- Streamlit App ---
-st.title("⚾ MLB Spread & Total Predictor with Vegas Lines + Smart Picks")
+st.title("⚾ MLB Spread & Total Predictor with Smart Picks & Confidence")
 
 selected_date = st.date_input("Select Game Date", date.today())
 games_df = fetch_schedule(selected_date)
@@ -183,15 +183,26 @@ with st.spinner("Running model + Vegas comparison..."):
             margin_edge = None if vegas_spread is None else round(model_margin - vegas_spread, 2)
             total_edge = None if vegas_total is None else round(model_total - vegas_total, 2)
 
+            spread_pick = None
+            total_pick = None
+
+            if vegas_spread is not None:
+                spread_pick = f"Home -{abs(vegas_spread)}" if model_margin > vegas_spread else f"Away +{abs(vegas_spread)}"
+
+            if vegas_total is not None:
+                total_pick = f"Over {vegas_total}" if model_total > vegas_total else f"Under {vegas_total}"
+
             results.append({
                 "Matchup": matchup,
                 "Model Margin (H - A)": model_margin,
                 "Vegas Spread": vegas_spread,
                 "Edge (Spread)": margin_edge,
+                "Model Pick (Spread)": spread_pick,
                 "Confidence (Spread)": confidence_score(margin_edge),
                 "Model Total Runs": model_total,
                 "Vegas Total": vegas_total,
                 "Edge (Total)": total_edge,
+                "Model Pick (Total)": total_pick,
                 "Confidence (Total)": confidence_score(total_edge)
             })
 
@@ -206,7 +217,7 @@ df = pd.DataFrame(results)
 st.dataframe(df.reset_index(drop=True), use_container_width=True)
 
 # --- Smart Picks Section: Best Edges ---
-st.subheader("📌 Best Picks vs Vegas Lines")
+st.subheader("📌 Smart Picks vs Vegas Lines")
 
 df_edges = df.dropna(subset=["Vegas Spread", "Vegas Total"])
 
@@ -221,9 +232,21 @@ top_total_picks = total_edges.sort_values(by="Edge (Total Abs)", ascending=False
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("#### 🟢 Best Spread Edges")
-    st.dataframe(top_spread_picks[["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)", "Confidence (Spread)"]].reset_index(drop=True), use_container_width=True)
+    st.markdown("#### 🟢 Best Spread Picks")
+    st.dataframe(
+        top_spread_picks[
+            ["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)", 
+             "Model Pick (Spread)", "Confidence (Spread)"]
+        ].reset_index(drop=True),
+        use_container_width=True
+    )
 
 with col2:
-    st.markdown("#### 🔵 Best O/U Edges")
-    st.dataframe(top_total_picks[["Matchup", "Model Total Runs", "Vegas Total", "Edge (Total)", "Confidence (Total)"]].reset_index(drop=True), use_container_width=True)
+    st.markdown("#### 🔵 Best Total Picks")
+    st.dataframe(
+        top_total_picks[
+            ["Matchup", "Model Total Runs", "Vegas Total", "Edge (Total)",
+             "Model Pick (Total)", "Confidence (Total)"]
+        ].reset_index(drop=True),
+        use_container_width=True
+    )
