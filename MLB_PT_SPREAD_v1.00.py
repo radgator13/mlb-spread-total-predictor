@@ -7,7 +7,7 @@ import math
 st.set_page_config(layout="wide")
 
 # --- Configuration ---
-API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # 🔑 Replace with your actual key
+API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your actual Odds API key
 SPORT = 'baseball_mlb'
 REGIONS = 'us'
 MARKETS = 'spreads,totals'
@@ -150,7 +150,6 @@ with st.spinner("Running model + Vegas comparison..."):
                 progress.progress((i + 1) / len(games_df))
                 continue
 
-            #st.write(f"📊 Processing: {matchup}")
             home_p_stats = fetch_stats(pitchers['home'], 'pitching')
             away_p_stats = fetch_stats(pitchers['away'], 'pitching')
             home_p_score = pitcher_score(home_p_stats)
@@ -165,7 +164,6 @@ with st.spinner("Running model + Vegas comparison..."):
             model_total = predict_total(home_p_score, away_p_score, home_h_score, away_h_score)
 
             vegas_spread, vegas_total = extract_vegas_odds(vegas_data, game['home'], game['away'])
-            #st.write(f"🧾 Vegas: Spread={vegas_spread}, Total={vegas_total}")
 
             margin_edge = None if vegas_spread is None else round(model_margin - vegas_spread, 2)
             total_edge = None if vegas_total is None else round(model_total - vegas_total, 2)
@@ -186,6 +184,29 @@ with st.spinner("Running model + Vegas comparison..."):
             st.error(f"❌ Error processing {game['away']} @ {game['home']}: {e}")
             continue
 
-# --- Display Table ---
+# --- Main Table ---
 df = pd.DataFrame(results)
 st.dataframe(df.reset_index(drop=True), use_container_width=True)
+
+# --- Smart Picks Section: Best Edges ---
+st.subheader("📌 Best Picks vs Vegas Lines")
+
+df_edges = df.dropna(subset=["Vegas Spread", "Vegas Total"])
+
+spread_edges = df_edges.copy()
+spread_edges["Edge (Spread Abs)"] = spread_edges["Edge (Spread)"].abs()
+top_spread_picks = spread_edges.sort_values(by="Edge (Spread Abs)", ascending=False).head(5)
+
+total_edges = df_edges.copy()
+total_edges["Edge (Total Abs)"] = total_edges["Edge (Total)"].abs()
+top_total_picks = total_edges.sort_values(by="Edge (Total Abs)", ascending=False).head(5)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("#### 🟢 Best Spread Edges")
+    st.dataframe(top_spread_picks[["Matchup", "Model Margin (H - A)", "Vegas Spread", "Edge (Spread)"]].reset_index(drop=True), use_container_width=True)
+
+with col2:
+    st.markdown("#### 🔵 Best O/U Edges")
+    st.dataframe(top_total_picks[["Matchup", "Model Total Runs", "Vegas Total", "Edge (Total)"]].reset_index(drop=True), use_container_width=True)
