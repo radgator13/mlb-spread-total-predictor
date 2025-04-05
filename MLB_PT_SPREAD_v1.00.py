@@ -8,7 +8,7 @@ import plotly.express as px  # for charting
 st.set_page_config(layout="wide")
 
 # --- Configuration ---
-API_KEY = 'YOUR_API_KEY'  # Replace with your Odds API key
+API_KEY = '8c20c59342e07c830e73aa8e6506b1c3'  # Replace with your Odds API key
 SPORT = 'baseball_mlb'
 REGIONS = 'us'
 MARKETS = 'spreads,totals'
