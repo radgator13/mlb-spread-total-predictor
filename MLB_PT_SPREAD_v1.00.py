@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from datetime import date
 import math
-import plotly.express as px  # for charting
+import plotly.express as px
 
 st.set_page_config(layout="wide")
 
@@ -90,7 +90,6 @@ def hitter_score(player_ids):
             continue
     return sum(scores) / len(scores) if scores else 50
 
-# --- Vegas Odds ---
 @st.cache_data(ttl=3600)
 def fetch_vegas_lines():
     url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds?regions={REGIONS}&markets={MARKETS}&oddsFormat={ODDS_FORMAT}&apiKey={API_KEY}"
@@ -117,7 +116,6 @@ def predict_margin(home_p, away_p, home_h, away_h):
     return round((home_p - away_p) * 0.4 + (home_h - away_h) * 0.6, 2)
 
 def predict_total(home_p, away_p, home_h, away_h):
-    # ✅ Calibrated for more balanced Over/Under
     return round((home_h + away_h) * 0.14 - (home_p + away_p) * 0.04 + 9.2, 2)
 
 def confidence_score(edge):
@@ -146,6 +144,11 @@ if games_df.empty:
     st.stop()
 
 vegas_data = fetch_vegas_lines()
+
+if not isinstance(vegas_data, list) or len(vegas_data) == 0:
+    st.error("❌ Could not load Vegas lines. Check your API key or try again later.")
+    st.stop()
+
 results = []
 team_rosters = {}
 
@@ -190,7 +193,6 @@ with st.spinner("Running model + Vegas comparison..."):
 
             if vegas_spread is not None:
                 spread_pick = f"Home -{abs(vegas_spread)}" if model_margin > vegas_spread else f"Away +{abs(vegas_spread)}"
-
             if vegas_total is not None:
                 total_pick = f"Over {vegas_total}" if model_total > vegas_total else f"Under {vegas_total}"
 
@@ -218,7 +220,7 @@ with st.spinner("Running model + Vegas comparison..."):
 df = pd.DataFrame(results)
 st.dataframe(df.reset_index(drop=True), use_container_width=True)
 
-# --- Smart Picks Section: Best Edges ---
+# --- Smart Picks ---
 st.subheader("📌 Smart Picks vs Vegas Lines")
 
 df_edges = df.dropna(subset=["Vegas Spread", "Vegas Total"])
@@ -257,31 +259,35 @@ with col2:
 st.subheader("📊 Model vs Vegas Totals")
 
 chart_df = df.dropna(subset=["Model Total Runs", "Vegas Total"]).copy()
-chart_df = chart_df.sort_values(by="Model Total Runs", ascending=False)
-
-fig_total = px.bar(
-    chart_df,
-    x="Matchup",
-    y=["Model Total Runs", "Vegas Total"],
-    barmode="group",
-    title="Model vs Vegas: Projected Total Runs",
-    labels={"value": "Total Runs", "variable": "Source"},
-    height=500
-)
-st.plotly_chart(fig_total, use_container_width=True)
+if not chart_df.empty:
+    chart_df = chart_df.sort_values(by="Model Total Runs", ascending=False)
+    fig_total = px.bar(
+        chart_df,
+        x="Matchup",
+        y=["Model Total Runs", "Vegas Total"],
+        barmode="group",
+        title="Model vs Vegas: Projected Total Runs",
+        labels={"value": "Total Runs", "variable": "Source"},
+        height=500
+    )
+    st.plotly_chart(fig_total, use_container_width=True)
+else:
+    st.info("No data available for total run chart.")
 
 st.subheader("📊 Model vs Vegas Spread (Margin)")
 
 chart_df = df.dropna(subset=["Model Margin (H - A)", "Vegas Spread"]).copy()
-chart_df = chart_df.sort_values(by="Model Margin (H - A)", ascending=False)
-
-fig_spread = px.bar(
-    chart_df,
-    x="Matchup",
-    y=["Model Margin (H - A)", "Vegas Spread"],
-    barmode="group",
-    title="Model vs Vegas: Spread Prediction",
-    labels={"value": "Spread", "variable": "Source"},
-    height=500
-)
-st.plotly_chart(fig_spread, use_container_width=True)
+if not chart_df.empty:
+    chart_df = chart_df.sort_values(by="Model Margin (H - A)", ascending=False)
+    fig_spread = px.bar(
+        chart_df,
+        x="Matchup",
+        y=["Model Margin (H - A)", "Vegas Spread"],
+        barmode="group",
+        title="Model vs Vegas: Spread Prediction",
+        labels={"value": "Spread", "variable": "Source"},
+        height=500
+    )
+    st.plotly_chart(fig_spread, use_container_width=True)
+else:
+    st.info("No data available for spread chart.")
